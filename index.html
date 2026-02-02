@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>심리테스트 영화 추천</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --accent: #38bdf8;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", system-ui, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: var(--text);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+
+    aside {
+      background: rgba(15, 23, 42, 0.9);
+      padding: 24px;
+      border-right: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    main {
+      padding: 32px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+
+    .card {
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+    }
+
+    .question {
+      margin-bottom: 16px;
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(31, 41, 55, 0.6);
+    }
+
+    .question h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .options {
+      display: grid;
+      gap: 8px;
+    }
+
+    label {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: rgba(15, 23, 42, 0.6);
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    label:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+    }
+
+    input[type="radio"] {
+      accent-color: var(--accent);
+    }
+
+    .button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: none;
+      font-weight: 700;
+      background: var(--accent);
+      color: #0f172a;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .api-input {
+      margin-top: 16px;
+    }
+
+    .api-input input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .genre-tag {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .movie-grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .movie-card {
+      background: var(--card);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    .movie-card img {
+      width: 100%;
+      height: 330px;
+      object-fit: cover;
+      background: #0b1222;
+    }
+
+    .movie-content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .movie-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .rating {
+      font-weight: 600;
+      color: #facc15;
+    }
+
+    .reason {
+      font-size: 13px;
+      color: var(--muted);
+      border-top: 1px dashed rgba(148, 163, 184, 0.3);
+      padding-top: 8px;
+      margin-top: auto;
+    }
+
+    .notice {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 8px 0 0;
+    }
+
+    .error {
+      color: #fca5a5;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: none;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <h1>심리테스트 영화 추천</h1>
+      <p class="notice">
+        간단한 질문에 답하고 <strong>결과 보기</strong>를 누르면
+        당신에게 맞는 장르와 TMDB 인기 영화 5편을 추천합니다.
+      </p>
+      <div class="api-input">
+        <label for="apiKey">TMDB API Key</label>
+        <input id="apiKey" type="password" placeholder="사이드바에서 입력" />
+        <p class="notice">API Key는 로컬에 저장되지 않습니다.</p>
+      </div>
+      <button class="button" id="resultButton">결과 보기</button>
+      <p class="error" id="errorMessage" hidden></p>
+    </aside>
+    <main>
+      <section class="card" id="quizSection"></section>
+      <section class="card" id="resultSection" hidden>
+        <div class="result-header">
+          <div>
+            <h2 id="resultTitle">당신에게 어울리는 장르</h2>
+            <p class="notice" id="resultReason"></p>
+          </div>
+          <span class="genre-tag" id="genreTag"></span>
+        </div>
+        <div class="movie-grid" id="movieGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const questions = [
+      {
+        text: "주말에 가장 하고 싶은 일은?",
+        options: [
+          { label: "즉흥적으로 모험 떠나기", genre: "action" },
+          { label: "친구들과 배꼽 잡는 파티", genre: "comedy" },
+          { label: "깊이 있는 생각을 하며 산책", genre: "drama" },
+        ],
+      },
+      {
+        text: "영화를 볼 때 중요한 요소는?",
+        options: [
+          { label: "화려한 비주얼과 미래 세계", genre: "sci-fi" },
+          { label: "두근두근 설레는 감정", genre: "romance" },
+          { label: "마법 같은 상상력", genre: "fantasy" },
+        ],
+      },
+      {
+        text: "친구가 당신을 한 단어로 표현한다면?",
+        options: [
+          { label: "에너지 넘치는 추진력", genre: "action" },
+          { label: "분위기 메이커", genre: "comedy" },
+          { label: "따뜻하고 공감하는 사람", genre: "romance" },
+        ],
+      },
+      {
+        text: "선호하는 이야기 전개는?",
+        options: [
+          { label: "빠르고 긴장감 있는 전개", genre: "action" },
+          { label: "잔잔하지만 여운이 남는 전개", genre: "drama" },
+          { label: "현실을 넘어선 세계", genre: "fantasy" },
+        ],
+      },
+      {
+        text: "지금 가장 필요한 감정은?",
+        options: [
+          { label: "통쾌함과 스릴", genre: "action" },
+          { label: "웃음과 기분 전환", genre: "comedy" },
+          { label: "따뜻한 위로", genre: "drama" },
+        ],
+      },
+    ];
+
+    const genreConfig = {
+      action: { label: "액션", id: 28, reason: "에너지 넘치는 도전을 즐겨요." },
+      comedy: { label: "코미디", id: 35, reason: "웃음과 활기를 중요하게 생각해요." },
+      drama: { label: "드라마", id: 18, reason: "깊이 있는 감정선을 선호해요." },
+      "sci-fi": { label: "SF", id: 878, reason: "미래적 상상력에 끌려요." },
+      romance: { label: "로맨스", id: 10749, reason: "설레는 관계 이야기에 끌려요." },
+      fantasy: { label: "판타지", id: 14, reason: "현실을 벗어난 세계를 좋아해요." },
+    };
+
+    const quizSection = document.getElementById("quizSection");
+    const resultButton = document.getElementById("resultButton");
+    const resultSection = document.getElementById("resultSection");
+    const resultReason = document.getElementById("resultReason");
+    const resultTitle = document.getElementById("resultTitle");
+    const genreTag = document.getElementById("genreTag");
+    const movieGrid = document.getElementById("movieGrid");
+    const apiKeyInput = document.getElementById("apiKey");
+    const errorMessage = document.getElementById("errorMessage");
+
+    const renderQuestions = () => {
+      quizSection.innerHTML = questions
+        .map((question, index) => {
+          const optionsHtml = question.options
+            .map((option, optionIndex) => {
+              const inputId = `q${index}-o${optionIndex}`;
+              return `
+                <label for="${inputId}">
+                  <input type="radio" name="question-${index}" id="${inputId}" value="${option.genre}" />
+                  <span>${option.label}</span>
+                </label>
+              `;
+            })
+            .join("");
+
+          return `
+            <div class="question">
+              <h3>Q${index + 1}. ${question.text}</h3>
+              <div class="options">
+                ${optionsHtml}
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    };
+
+    const getSelectedGenres = () => {
+      return questions.map((_, index) => {
+        const selected = document.querySelector(`input[name="question-${index}"]:checked`);
+        return selected?.value ?? null;
+      });
+    };
+
+    const pickGenre = (answers) => {
+      const scores = Object.keys(genreConfig).reduce((acc, genre) => {
+        acc[genre] = 0;
+        return acc;
+      }, {});
+
+      answers.forEach((genre) => {
+        if (genre && scores[genre] !== undefined) {
+          scores[genre] += 1;
+        }
+      });
+
+      return Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([genre]) => genre)[0];
+    };
+
+    const buildReason = (genreKey) => {
+      const config = genreConfig[genreKey];
+      return `당신의 답변은 ${config.label} 성향이 가장 강해요. ${config.reason}`;
+    };
+
+    const fetchMovies = async (apiKey, genreId) => {
+      const endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=${genreId}&language=ko-KR&sort_by=popularity.desc`;
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error("TMDB 데이터를 불러오지 못했습니다.");
+      }
+      const data = await response.json();
+      return data.results.slice(0, 5);
+    };
+
+    const renderMovies = (movies, reasonText) => {
+      movieGrid.innerHTML = movies
+        .map((movie) => {
+          const posterUrl = movie.poster_path
+            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+            : "https://via.placeholder.com/500x750?text=No+Image";
+          const overview = movie.overview || "줄거리 정보가 없습니다.";
+          return `
+            <div class="movie-card">
+              <img src="${posterUrl}" alt="${movie.title} 포스터" />
+              <div class="movie-content">
+                <div>
+                  <div class="movie-title">${movie.title}</div>
+                  <div class="rating">⭐ ${movie.vote_average.toFixed(1)}</div>
+                </div>
+                <p>${overview}</p>
+                <div class="reason">이 영화를 추천하는 이유: ${reasonText}</div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    };
+
+    const validateInputs = () => {
+      const answers = getSelectedGenres();
+      const apiKey = apiKeyInput.value.trim();
+
+      if (!apiKey) {
+        return { ok: false, message: "TMDB API Key를 입력해주세요." };
+      }
+
+      if (answers.some((answer) => answer === null)) {
+        return { ok: false, message: "모든 질문에 답해주세요." };
+      }
+
+      return { ok: true, apiKey, answers };
+    };
+
+    const handleResult = async () => {
+      errorMessage.hidden = true;
+      resultButton.disabled = true;
+      resultButton.textContent = "분석 중...";
+
+      const validation = validateInputs();
+      if (!validation.ok) {
+        errorMessage.textContent = validation.message;
+        errorMessage.hidden = false;
+        resultButton.disabled = false;
+        resultButton.textContent = "결과 보기";
+        return;
+      }
+
+      try {
+        const chosenGenre = pickGenre(validation.answers);
+        const config = genreConfig[chosenGenre];
+        const reasonText = buildReason(chosenGenre);
+
+        resultTitle.textContent = `당신에게 어울리는 장르는 ${config.label}입니다.`;
+        genreTag.textContent = config.label;
+        resultReason.textContent = reasonText;
+
+        const movies = await fetchMovies(validation.apiKey, config.id);
+        renderMovies(movies, reasonText);
+        resultSection.hidden = false;
+        resultSection.scrollIntoView({ behavior: "smooth" });
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.hidden = false;
+      } finally {
+        resultButton.disabled = false;
+        resultButton.textContent = "결과 보기";
+      }
+    };
+
+    renderQuestions();
+    resultButton.addEventListener("click", handleResult);
+  </script>
+</body>
+</html>
